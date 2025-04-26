@@ -39,6 +39,12 @@ class MainWindow(qtw.QWidget, Ui_Form):
         self.chk_ShowAccel.stateChanged.connect(self.controller.doPlot)
         self.show()
 
+        # Set validators for numerical inputs
+        double_validator = qtg.QDoubleValidator(0.0, 1e6, 2)
+        for le in [self.le_m1, self.le_v, self.le_k1, self.le_c1,
+                   self.le_m2, self.le_k2, self.le_ang, self.le_tmax]:
+            le.setValidator(double_validator)
+
     def doOptimize(self):
         app.setOverrideCursor(qtc.Qt.WaitCursor)
         self.controller.OptimizeSuspension()

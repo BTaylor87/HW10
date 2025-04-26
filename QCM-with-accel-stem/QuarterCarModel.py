@@ -123,23 +123,29 @@ class CarModel():
         self.yangdeg = 45.0  # ramp angle in degrees.  default is 45
         self.results = None
 
-        #set default values for the properties of the quarter car model
-        self.m1 = #$JES MISSING CODE# # mass of car body in kg
-        self.m2 = #$JES MISSING CODE#  # mass of wheel in kg
-        self.c1 = #$JES MISSING CODE#  # damping coefficient in N*s/m
-        self.k1 = #$JES MISSING CODE#  # spring constant of suspension in N/m
-        self.k2 = #$JES MISSING CODE#  # spring constant of tire in N/m
-        self.v = #$JES MISSING CODE#  # velocity of car in kph
+        # Set default values using physics calculations and GUI defaults
+        self.m1 = 450.0  # kg (car body mass from GUI default)
+        self.m2 = 20.0  # kg (wheel mass from GUI default)
+        self.c1 = 4500.0  # N*s/m (damping from GUI default)
+        self.k1 = 15000.0  # N/m (suspension spring from GUI)
+        self.k2 = 90000.0  # N/m (tire spring from GUI default)
+        self.v = 120.0  # kph (speed from GUI default)
 
+        # Calculate min/max spring constants using static deflection
+        g = 9.81  # m/s² (gravity)
 
-        self.mink1 = #$JES MISSING CODE#  #If I jack up my car and release the load on the spring, it extends about 3 inches
-        self.maxk1 = #$JES MISSING CODE#  #What would be a good value for a soft spring vs. a stiff spring?
-        self.mink2 = #$JES MISSING CODE#  #Same question for the shock absorber.
-        self.maxk2 = #$JES MISSING CODE#
-        self.accel =None
-        self.accelMax = #$JES MISSING CODE#
-        self.accelLim = #$JES MISSING CODE#
-        self.SSE = 0.0
+        # Suspension static deflection range: 3" (0.0762 m) to 6" (0.1524 m)
+        self.mink1 = (self.m1 * g) / 0.1524  # min k1 at max deflection (6")
+        self.maxk1 = (self.m1 * g) / 0.0762  # max k1 at min deflection (3")
+
+        # Tire static deflection range: 0.75" (0.01905 m) to 1.5" (0.0381 m)
+        total_mass = self.m1 + self.m2  # mass on tire
+        self.mink2 = (total_mass * g) / 0.0381  # min k2 at max deflection (1.5")
+        self.maxk2 = (total_mass * g) / 0.01905  # max k2 at min deflection (0.75")
+
+        # Acceleration limits (2.0g in m/s²)
+        self.accelLim = 2.0 * 9.81  # 19.62 m/s²
+        self.accelMax = 0.0  # initialize acceleration maximum
 
 class CarView():
     def __init__(self, args):
@@ -177,20 +183,80 @@ class CarView():
         self.doPlot(model)
 
     def buildScene(self):
-        #create a scene object
+        # create a scene object
         self.scene = qtw.QGraphicsScene()
         self.scene.setObjectName("MyScene")
         self.scene.setSceneRect(-200, -200, 400, 400)  # xLeft, yTop, Width, Height
 
-        #set the scene for the graphics view object
+        # set the scene for the graphics view object
         self.gv_Schematic.setScene(self.scene)
-        #make some pens and brushes for my drawing
+        # make some pens and brushes for my drawing
         self.setupPensAndBrushes()
-        self.Wheel = Wheel(0,50,50, pen=self.penWheel, wheelBrush=self.brushWheel, massBrush=self.brushMass, name = "Wheel")
-        self.CarBody = MassBlock(0, -70, 100, 30, pen=self.penWheel, brush=self.brushMass, name="Car Body", mass=150)
+
+        # Wheel object: draw wheel with tire mass
+        self.Wheel = Wheel(0, 50, 50, pen=self.penWheel, wheelBrush=self.brushWheel, massBrush=self.brushMass,
+                           name="Wheel")
         self.Wheel.addToScene(self.scene)
+
+        # Car body object: draw mass block representing the car body
+        self.CarBody = MassBlock(0, -70, 100, 30, pen=self.penWheel, brush=self.brushMass, name="Car Body", mass=150)
         self.scene.addItem(self.CarBody)
-        ##$JES MISSING CODE# #Finish building the scene to look similar to the schematic on the problem assignment
+
+        # JES MISSING CODE - ADDITIONAL GRAPHICS
+
+        # --- Suspension Spring (between Car Body and Wheel) ---
+        # Create a simple spring using a line
+        spring_pen = qtg.QPen(qtg.QColor("blue"))
+        spring_pen.setWidth(2)
+        self.scene.addLine(0, -55, 0, 25, spring_pen)  # vertical line from bottom of car to top of wheel
+
+        # --- Damper (Shock Absorber) next to Spring ---
+        damper_pen = qtg.QPen(qtg.QColor("red"))
+        damper_pen.setWidth(2)
+        self.scene.addLine(20, -55, 20, 25, damper_pen)  # vertical line for damper, offset sideways for clarity
+
+        # --- Tire Spring (between Wheel and Ground) ---
+        tire_pen = qtg.QPen(qtg.QColor("green"))
+        tire_pen.setWidth(2)
+        self.scene.addLine(0, 75, 0, 100, tire_pen)  # line from wheel bottom downward to ground
+
+        # --- Ground Line (Road Surface) ---
+        ground_pen = qtg.QPen(qtg.QColor("black"))
+        ground_pen.setWidth(2)
+        self.scene.addLine(-100, 100, 100, 100, ground_pen)  # long horizontal line representing the ground
+
+        # --- Labels (optional but helpful) ---
+        # Car label
+        car_text = qtw.QGraphicsTextItem("Car Body")
+        car_text.setPos(-50, -100)
+        self.scene.addItem(car_text)
+
+        # Wheel label
+        wheel_text = qtw.QGraphicsTextItem("Wheel + Tire")
+        wheel_text.setPos(-50, 80)
+        self.scene.addItem(wheel_text)
+
+        # Ground label
+        ground_text = qtw.QGraphicsTextItem("Ground")
+        ground_text.setPos(-50, 105)
+        self.scene.addItem(ground_text)
+
+        # Spring label
+        spring_text = qtw.QGraphicsTextItem("Suspension Spring")
+        spring_text.setPos(25, -15)
+        self.scene.addItem(spring_text)
+
+        # Damper label
+        damper_text = qtw.QGraphicsTextItem("Damper")
+        damper_text.setPos(45, -15)
+        self.scene.addItem(damper_text)
+
+        # Tire spring label
+        tire_text = qtw.QGraphicsTextItem("Tire Spring")
+        tire_text.setPos(25, 60)
+        self.scene.addItem(tire_text)
+
+    #End of Region
 
     def setupPensAndBrushes(self):
         self.penWheel = qtg.QPen(qtg.QColor("orange"))
@@ -202,19 +268,24 @@ class CarView():
         if model.results is None:
             return
         ax = self.ax
-        ax1=self.ax1
+        ax1 = self.ax1
         # plot result of odeint solver
         QTPlotting = True  # assumes we are plotting onto a QT GUI form
         if ax == None:
             ax = plt.subplot()
-            ax1=ax.twinx()
+            ax1 = ax.twinx()
             QTPlotting = False  # actually, we are just using CLI and showing the plot
+
         ax.clear()
         ax1.clear()
-        t=model.timeData
-        ycar = model.results[:,0]
-        ywheel=model.results[:,2]
-        accel=model.accelData
+
+        t = model.t
+
+        ycar = model.results[:, 0]
+        ywheel = model.results[:, 2]
+        accel = model.accel
+
+
 
         if self.chk_LogX.isChecked():
             ax.set_xlim(0.001,model.tmax)
@@ -275,44 +346,44 @@ class CarController():
         self.chk_IncludeAccel=qtw.QCheckBox()
 
     def ode_system(self, X, t):
-        # define the forcing function equation for the linear ramp
-        # It takes self.tramp time to climb the ramp, so y position is
-        # a linear function of time.
+        # Unpack state variables
+        x1, x1dot, x2, x2dot = X
+
+        # Road profile calculation
         if t < self.model.tramp:
             y = self.model.ymag * (t / self.model.tramp)
         else:
             y = self.model.ymag
 
-        x1 = #$JES MISSING CODE#  # car position in vertical direction
-        x1dot = #$JES MISSING CODE#  # car velocity  in vertical direction
-        x2 = #$JES MISSING CODE#  # wheel position in vertical direction
-        x2dot = #$JES MISSING CODE#  # wheel velocity in vertical direction
+        # Calculate forces using Hooke's Law and damping
+        F_suspension = self.model.k1 * (x2 - x1) + self.model.c1 * (x2dot - x1dot)
+        F_tire = self.model.k2 * (y - x2)
 
-        # write the non-trivial equations in vertical direction
-        x1ddot = #$JES MISSING CODE#)
-        x2ddot = #$JES MISSING CODE#
+        # Newton's Second Law for both masses
+        x1ddot = (F_suspension) / self.model.m1
+        x2ddot = (-F_suspension + F_tire) / self.model.m2
 
-        # return the derivatives of the input state vector
         return [x1dot, x1ddot, x2dot, x2ddot]
 
     def calculate(self, doCalc=True):
-        """
-        I will first set the basic properties of the car model and then calculate the result
-        in another function doCalc.
-        """
-        #Step 1.  Read from the widgets
-        self.model.m1 = #$JES MISSING CODE#
-        self.model.m2 = #$JES MISSING CODE#
-        self.model.c1 = #$JES MISSING CODE#
-        self.model.k1 = #$JES MISSING CODE#
-        self.model.k2 = #$JES MISSING CODE#
-        self.model.v = #$JES MISSING CODE#
+        # Read values from GUI widgets and convert to float
+        self.model.m1 = float(self.le_m1.text())
+        self.model.m2 = float(self.le_m2.text())
+        self.model.c1 = float(self.le_c1.text())
+        self.model.k1 = float(self.le_k1.text())
+        self.model.k2 = float(self.le_k2.text())
+        self.model.v = float(self.le_v.text())
 
-        #recalculate min and max k values
-        self.mink1=#$JES MISSING CODE#
-        self.maxk1=#$JES MISSING CODE#
-        self.mink2=#$JES MISSING CODE#
-        self.maxk2=#$JES MISSING CODE#
+        # Recalculate min/max spring constants based on current masses
+        g = 9.81
+        # Suspension springs (k1)
+        self.model.mink1 = (self.model.m1 * g) / 0.1524  # 6" deflection
+        self.model.maxk1 = (self.model.m1 * g) / 0.0762  # 3" deflection
+
+        # Tire springs (k2)
+        total_mass = self.model.m1 + self.model.m2
+        self.model.mink2 = (total_mass * g) / 0.0381  # 1.5" deflection
+        self.model.maxk2 = (total_mass * g) / 0.01905  # 0.75" deflection
 
         ymag=6.0/(12.0*3.3)   #This is the height of the ramp in m
         if ymag is not None:
@@ -369,21 +440,33 @@ class CarController():
 
     def OptimizeSuspension(self):
         """
-        Step 1:  set parameters based on GUI inputs by calling self.set(doCalc=False)
-        Step 2:  make an initial guess for k1, c1, k2
-        Step 3:  optimize the suspension
-        :return:
+        OptimizeSuspension
+        ------------------
+        Main method to optimize the suspension system (k1, c1, k2) by minimizing SSE.
+
+        Steps:
+        1. Read user parameters from GUI but do NOT solve yet (calculate(doCalc=False)).
+        2. Make an initial guess (x0) from current parameter values.
+        3. Use scipy.optimize.minimize with Nelder-Mead method to minimize SSE.
+        4. Update model and GUI with optimized suspension values.
         """
-        #Step 1:
-        #$JES MISSING CODE HERE$
+
+        # Step 1: Set parameters from GUI without calculation
         self.calculate(doCalc=False)
-        #Step 2:
-        #JES MISSING CODE HERE$
-        x0= # create a numpy array with initial values for k1, c1, and k2
-        #Step 3:
-        #JES MISSING CODE HERE$
-        answer= #use the Nelder-Mead method to minimize the SSE function (our objective function)
+
+        # Step 2: Initial guess using current values
+        x0 = np.array([self.model.k1, self.model.c1, self.model.k2])
+
+        # Step 3: Perform optimization using Nelder-Mead
+        answer = minimize(self.SSE, x0, method='Nelder-Mead')
+
+        # Update model with optimized values
+        self.model.k1, self.model.c1, self.model.k2 = answer.x
+
+        # Update GUI and plot
         self.view.updateView(self.model)
+
+    # End of Region
 
     def SSE(self, vals, optimizing=True):
         """
