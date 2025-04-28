@@ -133,19 +133,16 @@ class CarModel():
 
         # Calculate min/max spring constants using static deflection
         g = 9.81  # m/s² (gravity)
+        force = self.m1 * g
 
-        # Suspension static deflection range: 3" (0.0762 m) to 6" (0.1524 m)
-        self.mink1 = (self.m1 * g) / 0.1524  # min k1 at max deflection (6")
-        self.maxk1 = (self.m1 * g) / 0.0762  # max k1 at min deflection (3")
-
-        # Tire static deflection range: 0.75" (0.01905 m) to 1.5" (0.0381 m)
-        total_mass = self.m1 + self.m2  # mass on tire
-        self.mink2 = (total_mass * g) / 0.0381  # min k2 at max deflection (1.5")
-        self.maxk2 = (total_mass * g) / 0.01905  # max k2 at min deflection (0.75")
-
-        # Acceleration limits (2.0g in m/s²)
-        self.accelLim = 2.0 * 9.81  # 19.62 m/s²
-        self.accelMax = 0.0  # initialize acceleration maximum
+        self.mink1 = force / 0.1524  # 3 inches max compression
+        self.maxk1 = force / 0.0762  # 6 inches min compression
+        self.mink2 = force / 0.0381  # 0.75 inches max compression
+        self.maxk2 = force / 0.01905  # 1.5 inches min compression
+        self.accel = None
+        self.accelMax = None
+        self.accelLim = 2.0  # 2g limit
+        self.SSE = 0.0
 
 class CarView():
     def __init__(self, args):
@@ -203,60 +200,6 @@ class CarView():
         self.scene.addItem(self.CarBody)
 
         # JES MISSING CODE - ADDITIONAL GRAPHICS
-
-        # --- Suspension Spring (between Car Body and Wheel) ---
-        # Create a simple spring using a line
-        spring_pen = qtg.QPen(qtg.QColor("blue"))
-        spring_pen.setWidth(2)
-        self.scene.addLine(0, -55, 0, 25, spring_pen)  # vertical line from bottom of car to top of wheel
-
-        # --- Damper (Shock Absorber) next to Spring ---
-        damper_pen = qtg.QPen(qtg.QColor("red"))
-        damper_pen.setWidth(2)
-        self.scene.addLine(20, -55, 20, 25, damper_pen)  # vertical line for damper, offset sideways for clarity
-
-        # --- Tire Spring (between Wheel and Ground) ---
-        tire_pen = qtg.QPen(qtg.QColor("green"))
-        tire_pen.setWidth(2)
-        self.scene.addLine(0, 75, 0, 100, tire_pen)  # line from wheel bottom downward to ground
-
-        # --- Ground Line (Road Surface) ---
-        ground_pen = qtg.QPen(qtg.QColor("black"))
-        ground_pen.setWidth(2)
-        self.scene.addLine(-100, 100, 100, 100, ground_pen)  # long horizontal line representing the ground
-
-        # --- Labels (optional but helpful) ---
-        # Car label
-        car_text = qtw.QGraphicsTextItem("Car Body")
-        car_text.setPos(-50, -100)
-        self.scene.addItem(car_text)
-
-        # Wheel label
-        wheel_text = qtw.QGraphicsTextItem("Wheel + Tire")
-        wheel_text.setPos(-50, 80)
-        self.scene.addItem(wheel_text)
-
-        # Ground label
-        ground_text = qtw.QGraphicsTextItem("Ground")
-        ground_text.setPos(-50, 105)
-        self.scene.addItem(ground_text)
-
-        # Spring label
-        spring_text = qtw.QGraphicsTextItem("Suspension Spring")
-        spring_text.setPos(25, -15)
-        self.scene.addItem(spring_text)
-
-        # Damper label
-        damper_text = qtw.QGraphicsTextItem("Damper")
-        damper_text.setPos(45, -15)
-        self.scene.addItem(damper_text)
-
-        # Tire spring label
-        tire_text = qtw.QGraphicsTextItem("Tire Spring")
-        tire_text.setPos(25, 60)
-        self.scene.addItem(tire_text)
-
-    #End of Region
 
     def setupPensAndBrushes(self):
         self.penWheel = qtg.QPen(qtg.QColor("orange"))
@@ -355,13 +298,18 @@ class CarController():
         else:
             y = self.model.ymag
 
-        # Calculate forces using Hooke's Law and damping
-        F_suspension = self.model.k1 * (x2 - x1) + self.model.c1 * (x2dot - x1dot)
-        F_tire = self.model.k2 * (y - x2)
+        x1 = X[0]
+        x1dot = X[1]
+        x2 = X[2]
+        x2dot = X[3]
 
-        # Newton's Second Law for both masses
-        x1ddot = (F_suspension) / self.model.m1
-        x2ddot = (-F_suspension + F_tire) / self.model.m2
+        # write the non-trivial equations in vertical direction
+        x1ddot = -(self.model.k1 / self.model.m1) * (x1 - x2) - (self.model.c1 / self.model.m1) * (x1dot - x2dot)
+        x2ddot = ((self.model.k1 / self.model.m2) * (x1 - x2) + (self.model.c1 / self.model.m2) * (x1dot - x2dot)
+                  - (self.model.k2 / self.model.m2) * (x2 - y))
+
+        # return the derivatives of the input state vector
+        return [x1dot, x1ddot, x2dot, x2ddot]
 
         return [x1dot, x1ddot, x2dot, x2ddot]
 
